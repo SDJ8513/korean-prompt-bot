@@ -1,0 +1,53 @@
+name: 🎨 Korean Culture Daily Prompt Generator
+
+on:
+  schedule:
+    # 매일 오전 7시 KST (= UTC 22:00 전날)
+    - cron: '0 22 * * *'
+
+  # 수동 실행도 가능
+  workflow_dispatch:
+    inputs:
+      date_override:
+        description: '날짜 지정 (YYYY-MM-DD, 비워두면 오늘)'
+        required: false
+        default: ''
+      force_regen:
+        description: '강제 재생성 (이미 있어도 덮어쓰기)'
+        required: false
+        default: 'false'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # outputs/ 폴더에 파일 커밋하기 위함
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 의존성 설치
+        run: pip install anthropic requests python-dotenv
+
+      - name: 🔮 오늘의 프롬프트 생성
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DATE_OVERRIDE: ${{ github.event.inputs.date_override }}
+          FORCE_REGEN: ${{ github.event.inputs.force_regen }}
+        run: python scripts/generate.py
+
+      - name: 💾 결과물 커밋
+        run: |
+          git config user.name "Korean Prompt Bot"
+          git config user.email "bot@github-actions"
+          git add outputs/
+          git diff --staged --quiet || git commit -m "✨ $(date +'%Y-%m-%d') 한국 문화 프롬프트 자동 생성"
+          git push
